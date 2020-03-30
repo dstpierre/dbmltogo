@@ -1,3 +1,9 @@
+dbmltogo
+elm/*
+data/*
+test.dbml
+
+
 # Binaries for programs and plugins
 *.exe
 *.exe~

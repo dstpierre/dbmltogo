@@ -1,0 +1,103 @@
+package {{.PkgName}}
+
+import (
+	"database/sql"
+	"time"
+)
+
+// {{.EntityName}} ...
+type {{.EntityName}} struct {
+{{range .Fields}}	{{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+{{end}}
+}
+
+// {{.MemberName}} ...
+type {{.MemberName}} struct {
+	DB *sql.DB
+}
+
+// Create creates a new {{.EntityName}}
+func (repo *{{.MemberName}}) Create(entity {{.EntityName}}) (id {{.PKType}}, err error) {
+	err = repo.DB.QueryRow(`
+		INSERT INTO {{.TableName}}
+		VALUES({{range .InsertFields}}@{{.Name}},
+		{{end}}
+		)
+		SELECT SCOPE_IDENTITY()
+	`, {{range .InsertFields}}sql.Named("{{.Name}}", entity.{{.Name}}),
+		{{end}}
+	).Scan(&id)
+	return
+}
+
+// List lists all {{.EntityName}}
+func (repo *{{.MemberName}}) List() ([]{{.EntityName}}, error) {
+	rows, err := repo.DB.Query(`
+		SELECT
+			{{range .Fields}}{{.Name}},
+			{{end}}
+		FROM {{.TableName}}
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []{{.EntityName}}{}
+	for rows.Next() {
+		entity := {{.EntityName}}{}
+		if err := repo.scan(rows, &entity); err != nil {
+			return nil, err
+		}
+		results = append(results, entity)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// GetByID gets a {{.EntityName}} by {{.PKName}}
+func (repo *{{.MemberName}}) GetByID(id {{.PKType}}) (*{{.EntityName}}, error) {
+	row := repo.DB.QueryRow(`
+		SELECT
+			{{range .Fields}}{{.Name}},
+			{{end}}
+		FROM {{.TableName}}
+		WHERE {{.PKName}} = @id
+	`, sql.Named("id", id))
+
+	entity := &{{.EntityName}}{}
+	if err := repo.scan(row, entity); err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
+// Update saves a {{.EntityName}}
+func (repo *{{.MemberName}}) Update(id {{.PKType}}, entity {{.EntityName}}) error {
+	_, err := repo.DB.Exec(`
+		UPDATE {{.TableName}} SET
+			{{range .InsertFields}}{{.Name}} = @{{.Name}},
+			{{end}}
+		WHERE {{.PKName}} = @{{.PKName}}
+	`, {{range .Fields}}sql.Named("{{.Name}}", entity.{{.Name}}),
+		{{end}}
+	)
+	return err
+}
+
+// Delete delets a {{.EntityName}} by {{.PKName}}
+func (repo *{{.MemberName}}) Delete(id {{.PKType}}) error {
+	_, err := repo.DB.Exec(`
+		DELETE FROM {{.TableName}} WHERE {{.PKName}} = @id
+	`, sql.Named("id", id))
+	return err
+}
+
+func (repo *{{.MemberName}}) scan(rows scanner, entity *{{.EntityName}}) error {
+	return rows.Scan({{range .Fields}}&entity.{{.Name}},
+	{{end}}
+	)
+}
